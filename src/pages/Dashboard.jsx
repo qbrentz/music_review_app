@@ -91,8 +91,7 @@ function Dashboard() {
           song(*),
           album(*),
           playlist(*)`)
-        .order('rated_at', { ascending: false })
-        .limit(10);
+        .order('rated_at', { ascending: false });
 
       setMyReviews(myData || []);
       setRandomReviews(randomData || []);
@@ -154,7 +153,7 @@ function Dashboard() {
       <h2>Dashboard</h2>
       <Card className="mb-3 p-3">
         <h4>Welcome back!</h4>
-        <Button onClick={() => navigate('/review')} variant="primary" className="me-2">Leave a Review</Button>
+        
         <Button onClick={handleLogout} variant="secondary">Logout</Button>
       </Card>
 
