@@ -31,9 +31,12 @@ function ReviewForm() {
       setError('You must be logged in to submit a review.');
       return;
     }
-    
-    setReviewUserId(2);
-    console.log(reviewUserId);
+
+    setReviewUserId(2); // Replace with user.id in a real scenario
+    const numericAlbumId = album_id ? parseInt(album_id) : null;
+    const numericSongId = song_id ? parseInt(song_id) : null;
+    const numericPlaylistId = playlist_id ? parseInt(playlist_id) : null;
+
     const { error: insertError } = await supabase.from('rating').insert([
       {
         user_id: 2,
@@ -41,22 +44,65 @@ function ReviewForm() {
         entity_id: parseInt(entityId),
         rating_value: ratingValue,
         comment,
-        album_id: parseInt(album_id),
-        song_id: parseInt(song_id),
-        playlist_id: parseInt(playlist_id),
+        album_id: numericAlbumId,
+        song_id: numericSongId,
+        playlist_id: numericPlaylistId,
         rated_at: new Date().toISOString(),
       },
     ]);
 
     if (insertError) {
       setError('Error submitting review: ' + insertError.message);
-    } else {
-      setSuccess('Review submitted successfully!');
-      setComment('');
-      if (!location.state?.entityType) setEntityType('song');
-      if (!location.state?.entityId) setEntityId('');
-      setRatingValue(5);
+      return;
     }
+
+    // Recalculate and update average rating for entity
+    let targetTable = '';
+    let targetId = null;
+    let targetColumn = '';
+
+    if (entityType === 'album') {
+      targetTable = 'album';
+      targetId = numericAlbumId;
+      targetColumn = 'album_id';
+    } else if (entityType === 'song') {
+      targetTable = 'song';
+      targetId = numericSongId;
+      targetColumn = 'song_id';
+    } else if (entityType === 'playlist') {
+      targetTable = 'playlist';
+      targetId = numericPlaylistId;
+      targetColumn = 'playlist_id';
+    }
+
+    if (targetTable && targetId) {
+      const { data: ratings, error: fetchError } = await supabase
+        .from('rating')
+        .select('rating_value')
+        .eq(targetColumn, targetId);
+
+      if (!fetchError && ratings.length > 0) {
+        const total = ratings.reduce((sum, r) => sum + r.rating_value, 0);
+        const avg = total / ratings.length;
+
+        const { error: updateError } = await supabase
+          .from(targetTable)
+          .update({ [`${targetTable}_rating`]: avg })
+          .eq(targetColumn, targetId);
+
+        if (updateError) {
+          console.error(updateError);
+          setError('Review saved, but failed to update rating.');
+          return;
+        }
+      }
+    }
+
+    setSuccess('Review submitted and rating updated!');
+    setComment('');
+    if (!location.state?.entityType) setEntityType('song');
+    if (!location.state?.entityId) setEntityId('');
+    setRatingValue(5);
   };
 
   return (

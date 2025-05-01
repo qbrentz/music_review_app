@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 function Dashboard() {
-  const [userData, setMyUserData] = useState([])
+  const [userData, setMyUserData] = useState([]);
   const [myReviews, setMyReviews] = useState([]);
   const [randomReviews, setRandomReviews] = useState([]);
   const [albumsDB, setAlbumsDB] = useState([]);
@@ -13,6 +13,9 @@ function Dashboard() {
   const [albumPage, setAlbumPage] = useState(1);
   const [totalAlbums, setTotalAlbums] = useState(0);
   const [playlists, setPlaylists] = useState([]);
+  const [randomReviewPage, setRandomReviewPage] = useState(1);
+  const reviewsPerPage = 5;
+  const [totalRandomReviews, setTotalRandomReviews] = useState(0);
   const albumsPerPage = 5;
 
   const navigate = useNavigate();
@@ -21,58 +24,51 @@ function Dashboard() {
     await supabase.auth.signOut();
     navigate('/');
   };
-  
-  useEffect(() => {
 
+  useEffect(() => {
     const fetchPlaylistsWithSongs = async () => {
       const { data: playlistsData, error: playlistsError } = await supabase
         .from('playlist')
         .select('playlist_id, name, link');
-  
+
       if (playlistsError) {
         console.error(playlistsError);
         return;
       }
-  
-      // Fetch all Playlist_Song mappings + song info
+
       const { data: playlistSongsData, error: psError } = await supabase
         .from('playlist_song')
         .select('playlist_id, song:song_id(title, artist, genre, duration)');
-  
+
       if (psError) {
         console.error(psError);
         return;
       }
-  
-      // Group songs by playlist
+
       const playlistMap = {};
       playlistsData.forEach((pl) => {
         playlistMap[pl.playlist_id] = { ...pl, songs: [] };
       });
-  
+
       playlistSongsData.forEach((ps) => {
         if (playlistMap[ps.playlist_id]) {
           playlistMap[ps.playlist_id].songs.push(ps.song);
         }
       });
-  
+
       setPlaylists(Object.values(playlistMap));
     };
-  
-    
 
-    const fetchUserData = async () =>{
-      const { data: userData } = await supabase.from('User')
-      .select('*');
+    const fetchUserData = async () => {
+      const { data: userData } = await supabase.from('User').select('*');
       setMyUserData(userData || []);
-    }
+    };
 
-    
     const fetchReviews = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      
+
       if (!user) return;
 
       const { data: myData } = await supabase
@@ -82,8 +78,16 @@ function Dashboard() {
           song(*),
           album(*),
           playlist(*)`)
-          .eq('user_id', userData.user_id);
-        
+        .eq('user_id', user.user_id);
+
+      const start = (randomReviewPage - 1) * reviewsPerPage;
+      const end = start + reviewsPerPage - 1;
+
+      const { count: reviewCount } = await supabase
+        .from('rating')
+        .select('*', { count: 'exact', head: true });
+
+      setTotalRandomReviews(reviewCount || 0);
 
       const { data: randomData } = await supabase
         .from('rating')
@@ -91,11 +95,32 @@ function Dashboard() {
           song(*),
           album(*),
           playlist(*)`)
-        .order('rated_at', { ascending: false });
+        .order('rated_at', { ascending: false })
+        .range(start, end);
 
       setMyReviews(myData || []);
       setRandomReviews(randomData || []);
-      
+    };
+
+    const fetchAlbumsDB = async (page) => {
+      const start = (page - 1) * albumsPerPage;
+      const end = start + albumsPerPage - 1;
+
+      const { data: albums } = await supabase
+        .from('album')
+        .select('*')
+        .order('release_date', { ascending: false })
+        .range(start, end);
+
+      setAlbumsDB(albums || []);
+    };
+
+    const fetchAlbumCount = async () => {
+      const { count } = await supabase
+        .from('album')
+        .select('*', { count: 'exact', head: true });
+
+      setTotalAlbums(count || 0);
     };
 
     fetchPlaylistsWithSongs();
@@ -103,28 +128,7 @@ function Dashboard() {
     fetchReviews();
     fetchAlbumsDB(albumPage);
     fetchAlbumCount();
-  }, [albumPage]);
-
-  const fetchAlbumsDB = async (page) => {
-    const start = (page - 1) * albumsPerPage;
-    const end = start + albumsPerPage - 1;
-
-    const { data: albums } = await supabase
-      .from('album')
-      .select('*')
-      .order('release_date', { ascending: false })
-      .range(start, end);
-
-    setAlbumsDB(albums || []);
-  };
-
-  const fetchAlbumCount = async () => {
-    const { count } = await supabase
-      .from('album')
-      .select('*', { count: 'exact', head: true });
-
-    setTotalAlbums(count || 0);
-  };
+  }, [albumPage, randomReviewPage]);
 
   const fetchSongsForAlbum = async (albumId) => {
     if (expandedAlbumId === albumId) {
@@ -142,22 +146,33 @@ function Dashboard() {
     setExpandedAlbumId(albumId);
   };
 
-  const handleReviewRedirect = (entityType, entityId, entityName, album_id, song_id, playlist_id) => {
-    navigate('/review', { state: { entityType, entityId, entityName, album_id, song_id, playlist_id } });
+  const handleReviewRedirect = (
+    entityType,
+    entityId,
+    entityName,
+    album_id,
+    song_id,
+    playlist_id
+  ) => {
+    navigate('/review', {
+      state: { entityType, entityId, entityName, album_id, song_id, playlist_id },
+    });
   };
 
   const totalPages = Math.ceil(totalAlbums / albumsPerPage);
+  const totalReviewPages = Math.ceil(totalRandomReviews / reviewsPerPage);
 
   return (
     <Container className="mt-5">
       <h2>Dashboard</h2>
       <Card className="mb-3 p-3">
         <h4>Welcome back!</h4>
-        
-        <Button onClick={handleLogout} variant="secondary">Logout</Button>
+        <Button onClick={handleLogout} variant="secondary">
+          Logout
+        </Button>
       </Card>
 
-      <h4>Your Reviews</h4>
+     {/* <h4>Your Reviews</h4>
       <Table striped bordered hover>
         <thead>
           <tr>
@@ -188,6 +203,7 @@ function Dashboard() {
           ))}
         </tbody>
       </Table>
+       */}
 
       <h4>Recent Reviews</h4>
       <Table striped bordered hover>
@@ -220,6 +236,17 @@ function Dashboard() {
           ))}
         </tbody>
       </Table>
+      <Pagination>
+        {[...Array(totalReviewPages)].map((_, index) => (
+          <Pagination.Item
+            key={index + 1}
+            active={index + 1 === randomReviewPage}
+            onClick={() => setRandomReviewPage(index + 1)}
+      >
+        {index + 1}
+      </Pagination.Item>
+    ))}
+  </Pagination>
 
       <h4>View Albums</h4>
       <Table>
