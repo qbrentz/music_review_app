@@ -2,7 +2,7 @@
   "name": "cmsc408-sp2025-semproj-buff-and-bumble",
   "version": "1.0.0",
   "description": "Final submission for Buff and Bumble project",
-  "homepage": "https://qbrentz.github.io/music_review_app",
+  "homepage": "https://qbrentz.github.io/music_review_app/",
   "main": "index.js",
   "scripts": {
     "predeploy": "npm run build",
