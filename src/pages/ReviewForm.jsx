@@ -97,11 +97,11 @@ function ReviewForm() {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label>Rating (1 to 10)</Form.Label>
+          <Form.Label>Rating (1 to 5)</Form.Label>
           <Form.Control
             type="number"
             min="1"
-            max="10"
+            max="5"
             value={ratingValue}
             onChange={(e) => setRatingValue(parseInt(e.target.value))}
             required
